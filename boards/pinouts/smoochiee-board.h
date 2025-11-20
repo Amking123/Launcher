@@ -44,17 +44,21 @@ static const uint8_t G44 = 44;
 static const uint8_t G46 = 46;
 
 static const uint8_t ADC1 = 7;
-static const uint8_t ADC2 = 8;
+static const uint8_t ADC2 = 8
 
+// ===================== BUTTONS VIA I2C KEYPAD =====================
 #define BTN_ALIAS '"OK"'
-#define HAS_5_BUTTONS
 #define HAS_BTN
-#define SEL_BTN 0
-#define UP_BTN 41
-#define DW_BTN 40
-#define R_BTN 38
-#define L_BTN 39
-#define BTN_ACT LOW
+#define HAS_5_BUTTONS
+
+// Original 5 buttons now mapped to I2C keypad keys (0–15)
+#define SEL_BTN 4  // I2C Key 4 = Select
+#define UP_BTN 1   // I2C Key 1 = Up
+#define DW_BTN 13  // I2C Key 13 = Down
+#define R_BTN 6    // I2C Key 6 = Right
+#define L_BTN 5    // I2C Key 5 = Left
+
+#define BTN_ACT LOW  // Original logic unchanged
 
 #define LED 5
 #define LED_ON HIGH
@@ -101,5 +105,5 @@ static const uint8_t ADC2 = 8;
 #define SPI_MOSI_PIN 12
 #define SPI_MISO_PIN 11
 #define SPI_SS_PIN 43
-/* Pins_Arduino_h */
-#endif
+
+#endif /* Pins_Arduino_h */
