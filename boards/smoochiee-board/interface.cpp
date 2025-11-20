@@ -1,24 +1,19 @@
 #include "powerSave.h"
-
-/***************************************************************************************
-** Function name: _setup_gpio()
-** Location: main.cpp
-** Description:   initial setup for the device
-***************************************************************************************/
-
-// Power handler for battery detection
 #include <Wire.h>
 #include <XPowersLib.h>
+#include <I2CKeyPad.h>
+
 XPowersPPM PPM;
 
+// I2C keypad
+#define KEYPAD_ADDR 0x20
+I2CKeyPad keypad(KEYPAD_ADDR);
+
 void _setup_gpio() {
-
-    pinMode(UP_BTN, INPUT); // Sets the power btn as an INPUT
-    pinMode(SEL_BTN, INPUT);
-    pinMode(DW_BTN, INPUT);
-    pinMode(R_BTN, INPUT);
-    pinMode(L_BTN, INPUT);
-
+    // --------------------------
+    // Remove GPIO pinMode setup for buttons
+    // --------------------------
+    // Keep SPI pins
     pinMode(CC1101_SS_PIN, OUTPUT);
     pinMode(NRF24_SS_PIN, OUTPUT);
     pinMode(45, OUTPUT);
@@ -26,8 +21,8 @@ void _setup_gpio() {
     digitalWrite(45, HIGH);
     digitalWrite(CC1101_SS_PIN, HIGH);
     digitalWrite(NRF24_SS_PIN, HIGH);
-    // Starts SPI instance for CC1101 and NRF24 with CS pins blocking communication at start
 
+    // Power management
     bool pmu_ret = false;
     Wire.begin(GROVE_SDA, GROVE_SCL);
     pmu_ret = PPM.init(Wire, GROVE_SDA, GROVE_SCL, BQ25896_SLAVE_ADDRESS);
@@ -46,84 +41,82 @@ void _setup_gpio() {
         PPM.enableOTG();
         PPM.disableOTG();
     }
+
+    // Initialize I2C keypad
+    keypad.begin(Wire);
 }
 
-/***************************************************************************************
-** Function name: getBattery()
-** location: display.cpp
-** Description:   Delivers the battery value from 1-100+
-***************************************************************************************/
+// ---------------- BATTERY ----------------
 int getBattery() {
     uint8_t percent = 0;
     percent = (PPM.getSystemVoltage() - 3300) * 100 / (float)(4150 - 3350);
-
     return (percent < 0) ? 0 : (percent >= 100) ? 100 : percent;
 }
 
-/*********************************************************************
-** Function: setBrightness
-** location: settings.cpp
-** set brightness value
-**********************************************************************/
+// ---------------- BRIGHTNESS ----------------
 void _setBrightness(uint8_t brightval) {
     int bl = MINBRIGHT + round(((255 - MINBRIGHT) * bright / 100));
     analogWrite(TFT_BL, bl);
 }
 
-/*********************************************************************
-** Function: InputHandler
-** Handles the variables PrevPress, NextPress, SelPress, AnyKeyPress and EscPress
-**********************************************************************/
+// ---------------- INPUT HANDLER ----------------
 void InputHandler(void) {
     static unsigned long tm = 0;
     if (millis() - tm < 200 && !LongPress) return;
-    // read all inputs only once, instead of 4
-    bool l = digitalRead(L_BTN);
-    bool r = digitalRead(R_BTN);
-    bool u = digitalRead(UP_BTN);
-    bool d = digitalRead(DW_BTN);
-    bool s = digitalRead(SEL_BTN);
 
-    if (s == BTN_ACT || u == BTN_ACT || d == BTN_ACT || r == BTN_ACT || l == BTN_ACT) {
-        if (!wakeUpScreen()) AnyKeyPress = true;
-        else return;
-    } else return;
-    if (l == BTN_ACT) { PrevPress = true; }
-    if (r == BTN_ACT) { NextPress = true; }
-    if (u == BTN_ACT) { UpPress = true; }
-    if (d == BTN_ACT) { DownPress = true; }
-    if (s == BTN_ACT) { SelPress = true; }
-    // Press Left and Right trigger EscPress
+    // read key from keypad
+    uint8_t key = keypad.getKey();
+    if (key == I2C_KEYPAD_NOKEY) return;
+
+    if (!wakeUpScreen()) AnyKeyPress = true;
+    else return;
+
+    // Map keypad codes to original button names
+    bool l = (key == 5);    // L_BTN
+    bool r = (key == 6);    // R_BTN
+    bool u = (key == 1);    // UP_BTN
+    bool d = (key == 13);   // DW_BTN
+    bool s = (key == 4);    // SEL_BTN
+
+    if (l) PrevPress = true;
+    if (r) NextPress = true;
+    if (u) UpPress = true;
+    if (d) DownPress = true;
+    if (s) SelPress = true;
+
+    // EscPress remains Left+Right
     if (PrevPress && NextPress) {
         PrevPress = false;
         NextPress = false;
         EscPress = true;
     }
+
     tm = millis();
 }
 
-/*********************************************************************
-** Function: powerOff
-** location: mykeyboard.cpp
-** Turns off the device (or try to)
-**********************************************************************/
+// ---------------- POWER OFF ----------------
 void powerOff() {
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)SEL_BTN, BTN_ACT);
+    // Wake on SELECT no longer possible via I2C
     esp_deep_sleep_start();
 }
 
-/*********************************************************************
-** Function: checkReboot
-** location: mykeyboard.cpp
-** Btn logic to tornoff the device (name is odd btw)
-**********************************************************************/
+// ---------------- REBOOT / LONG PRESS ----------------
 void checkReboot() {
     int countDown;
-    /* Long press power off */
-    if (digitalRead(L_BTN) == BTN_ACT && digitalRead(R_BTN) == BTN_ACT) {
-        uint32_t time_count = millis();
-        while (digitalRead(L_BTN) == BTN_ACT && digitalRead(R_BTN) == BTN_ACT) {
-            // Display poweroff bar only if holding button
+    static unsigned long time_count = 0;
+    static bool counting = false;
+
+    uint8_t key = keypad.getKey();
+    bool leftPressed  = (key == 5);
+    bool rightPressed = (key == 6);
+
+    if (leftPressed && rightPressed) {
+        if (!counting) {
+            time_count = millis();
+            counting = true;
+        }
+
+        while (leftPressed && rightPressed) {
             if (millis() - time_count > 500) {
                 tft->setTextSize(1);
                 tft->setTextColor(FGCOLOR, BGCOLOR);
@@ -132,16 +125,20 @@ void checkReboot() {
                     tft->drawCentreString("PWR OFF IN " + String(countDown) + "/3", tftWidth / 2, 12, 1);
                 else {
                     tft->fillScreen(BGCOLOR);
-                    while (digitalRead(L_BTN) == BTN_ACT || digitalRead(R_BTN) == BTN_ACT);
+                    while (keypad.getKey() == 5 || keypad.getKey() == 6); // wait release
                     delay(200);
                     powerOff();
                 }
                 delay(10);
             }
+            key = keypad.getKey();
+            leftPressed  = (key == 5);
+            rightPressed = (key == 6);
         }
 
         // Clear text after releasing the button
         delay(30);
         tft->fillRect(60, 12, tftWidth - 60, 8, BGCOLOR);
+        counting = false;
     }
 }
