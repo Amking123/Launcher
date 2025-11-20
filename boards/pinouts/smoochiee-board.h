@@ -72,22 +72,22 @@ static const uint8_t ADC2 = 8
 #define ROTATION 1
 #define MINBRIGHT 160
 
-#define ST7789_DRIVER 1
-#define TFT_WIDTH 170
-#define TFT_HEIGHT 320
-#define TFT_BL 6
-#define TFT_RST 16
-#define TFT_DC 15
-#define TFT_MOSI 17
-#define TFT_MISO 8
-#define TFT_SCLK 18
-#define TFT_CS 7
+#define ST7735_DRIVER 1
+#define TFT_WIDTH 128
+#define TFT_HEIGHT 160
+#define TFT_BL 13
+#define TFT_RST 17
+#define TFT_DC 16
+#define TFT_MOSI 35
+#define TFT_MISO -1
+#define TFT_SCLK 36
+#define TFT_CS 15
 
 #define GFX_BL 21
-#define TFT_IPS 1
-#define TFT_COL_OFS1 35
+#define TFT_IPS 0
+#define TFT_COL_OFS1 0
 #define TFT_ROW_OFS1 0
-#define TFT_COL_OFS2 35
+#define TFT_COL_OFS2 0
 #define TFT_ROW_OFS2 0
 
 #define CC1101_SS_PIN 46
@@ -96,10 +96,10 @@ static const uint8_t ADC2 = 8
 #define SDCARD_CS 3
 #define SDCARD_SCK 18
 #define SDCARD_MISO 8
-#define SDCARD_MOSI 17
+#define SDCARD_MOSI 1
 
-#define GROVE_SDA 47
-#define GROVE_SCL 48
+#define GROVE_SDA 10
+#define GROVE_SCL 9
 
 #define SPI_SCK_PIN 13
 #define SPI_MOSI_PIN 12
